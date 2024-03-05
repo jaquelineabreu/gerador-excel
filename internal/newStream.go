@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"database/sql"
 	"fmt"
 	"gerador-excel/models"
 	"log/slog"
@@ -8,7 +9,7 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func NewStreamWriter(allocationsChan <-chan models.AllocationKeyReport, errChan <-chan error) error {
+func NewStreamWriter(rows *sql.Rows) error {
 	f := excelize.NewFile()
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -20,6 +21,8 @@ func NewStreamWriter(allocationsChan <-chan models.AllocationKeyReport, errChan 
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
 	}
+
+	defer rows.Close()
 
 	headers := []string{
 		"Id", "Cycle ID", "Origin Area ID", "Origin Sub Area ID", "Origin Desk ID", "Allocated Desk ID",
@@ -36,7 +39,24 @@ func NewStreamWriter(allocationsChan <-chan models.AllocationKeyReport, errChan 
 	}
 
 	rowIndex := 2
-	for allocation := range allocationsChan {
+	for rows.Next() {
+		var allocation models.AllocationKeyReport
+		err := rows.Scan(
+			&allocation.Id, &allocation.CycleId, &allocation.OriginAreaId, &allocation.OriginSubAreaId,
+			&allocation.OriginDeskId, &allocation.AllocatedDeskId, &allocation.ActivityId, &allocation.ProjectId,
+			&allocation.HeadCountId, &allocation.OriginArea, &allocation.OriginSubArea, &allocation.OriginDesk,
+			&allocation.AllocatedArea, &allocation.AllocatedSubArea, &allocation.AllocatedDesk, &allocation.Activity,
+			&allocation.ActivityDescription, &allocation.PredefinedAllocationKey, &allocation.Project,
+			&allocation.ProjectDescription, &allocation.HeadCountDescription, &allocation.FinalValue,
+			&allocation.AllocatedValue, &allocation.ActivityType, &allocation.ProjectType, &allocation.CreatedBy,
+			&allocation.UpdatedBy, &allocation.CurrencyId, &allocation.CostSubCategory, &allocation.DeskPercent,
+			&allocation.UpdatedAt, &allocation.CreatedAt, &allocation.DeletedAt,
+		)
+		if err != nil {
+			slog.Error("Erro ao escanear dados: ", err)
+			return err
+		}
+
 		row := []interface{}{
 			allocation.Id, allocation.CycleId,
 			treatsInt64(allocation.OriginAreaId),
@@ -80,17 +100,12 @@ func NewStreamWriter(allocationsChan <-chan models.AllocationKeyReport, errChan 
 		rowIndex++
 	}
 
-	if err, ok := <-errChan; ok && err != nil {
-		slog.Error("Erro recebido do canal de erro:", err)
-		return err
-	}
-
 	if err := sw.Flush(); err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
 	}
 
-	if err := f.SaveAs("AllocationKeyReport.xlsx"); err != nil {
+	if err := f.SaveAs("AllocationSemCanal.xlsx"); err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
 	}

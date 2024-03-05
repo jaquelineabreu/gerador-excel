@@ -23,14 +23,14 @@ func main() {
 	slog.Info("Conectando ao banco..")
 	db := db.Conection()
 
-	slog.Info("Obtendo dados do banco sem canal...")
+	slog.Info("Obtendo dados do banco ...")
 	allocations, err := repository.SelectAllAllocationKeyReports(db)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Erro ao obter dados do banco: %v", err))
 	}
 
-	slog.Info("Gerando planilha sem canal...")
-	if err := internal.NewStreamWriterSemCanal(allocations); err != nil {
+	slog.Info("Gerando planilha ...")
+	if err := internal.NewStreamWriter(allocations); err != nil {
 		slog.Error(fmt.Sprintf("Falha ao gerar a planilha: %v", err))
 		os.Exit(1)
 	}
